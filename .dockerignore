@@ -1,0 +1,13 @@
+# Host build outputs of the vendored nostrdb. A tree built on the host
+# (glibc) must not reach the musl image: build.sh skips configure when
+# config.log exists and would reuse host objects and Makefiles.
+server/db/nostrdb/lib
+server/db/nostrdb/include
+**/*.o
+**/*.a
+**/*.la
+**/*.lo
+**/.libs
+**/.deps
+**/config.log
+**/config.status
