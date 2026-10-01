@@ -15,8 +15,115 @@ relays:
   - wss://relay.ditto.pub
   - wss://wheat.oslim.dev
 
+# Content kinds only (chosen by arkinox 2026-10-01). Copying every kind would
+# add ~2 GB/day, mostly machine data (NIP-85 assertions, app data).
 filters:
-  - {} # every kind
+  - kinds:
+      # Deletions: not content, but REQUIRED. The harvester can only refuse a
+      # deleted event if it holds the deletion (honor_deletions).
+      - 5
+      # Profiles, notes, glyphbyte (1738: new, not specified yet), threads,
+      # comments, highlights, polls
+      - 0
+      - 1
+      - 1738
+      - 11
+      - 1111
+      - 9802
+      - 1068
+      # Long-form and knowledge: articles (NIP-23), Alexandria publication
+      # index and content (NKBIP-01), wiki (NIP-54), web bookmarks (NIP-B0)
+      - 30023
+      - 30040
+      - 30041
+      - 30818
+      - 39701
+      # Pictures and video (NIP-68, NIP-71 regular and addressable), file
+      # metadata (NIP-94)
+      - 20
+      - 21
+      - 22
+      - 34235
+      - 34236
+      - 1063
+      # Audio: voice messages (NIP-A0), NIP-F4 podcasts, Fanfares music 36787
+      # (current) + playlists 34139 + legacy music 31337, Fanfares podcast
+      # episodes 31338 and audiobooks 31339 (current; chapters live inside)
+      - 1222
+      - 1244
+      - 54
+      - 10154
+      - 36787
+      - 34139
+      - 31337
+      - 31338
+      - 31339
+      # Cyberspace: SNO objects (DECK-0003) and avatars
+      - 33331
+      - 11333
+      # Places and events: geocaches (NIP-CC), calendar events (NIP-52),
+      # live events (NIP-53)
+      - 37516
+      - 7516
+      - 31922
+      - 31923
+      - 30311
+      # Code (NIP-C0, NIP-34), apps (32267), nsites (NIP-5A), classifieds
+      # (NIP-99), badge definitions (NIP-58), torrents (NIP-35), chess (NIP-64)
+      - 1337
+      - 30617
+      - 1617
+      - 1618
+      - 1621
+      - 32267
+      - 15128
+      - 35128
+      - 30402
+      - 30009
+      - 2003
+      - 64
+      # NIP-51 standard lists (current; 30001 is deprecated)
+      - 3
+      - 10000
+      - 10001
+      - 10002
+      - 10003
+      - 10004
+      - 10005
+      - 10006
+      - 10007
+      - 10008
+      - 10009
+      - 10012
+      - 10013
+      - 10015
+      - 10017
+      - 10018
+      - 10020
+      - 10021
+      - 10030
+      - 10050
+      - 10054
+      - 10063
+      - 10064
+      - 10101
+      - 10102
+      # NIP-51 sets
+      - 30000
+      - 30002
+      - 30003
+      - 30004
+      - 30005
+      - 30006
+      - 30007
+      - 30008
+      - 30015
+      - 30030
+      - 30063
+      - 30267
+      - 31924
+      - 39089
+      - 39092
 
 exclude_kinds: []
 respect_whitelist: false
