@@ -1,3 +1,5 @@
+> **glyphbyte relay.** This repository is a fork of grain; see [FORK.md](FORK.md) for what it adds and how it stays up to date with upstream.
+
 # GRAIN 🌾
 
 [![Go Version](https://img.shields.io/github/go-mod/go-version/0ceanslim/grain)](https://golang.org/)
