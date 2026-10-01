@@ -1,0 +1,37 @@
+# glyphbyte relay: harvest as many public events as possible so partial ids
+# (glyphbyte readings) resolve. See docs/harvest.md for every option.
+enabled: true
+
+relays:
+  - wss://relay.damus.io
+  - wss://nos.lol
+  - wss://relay.primal.net
+  - wss://relay.nostr.net
+  - wss://nostr.mom
+  - wss://offchain.pub
+  - wss://relay.snort.social
+  - url: wss://purplepag.es # refuses filters without kinds
+    filters: [{kinds: [0, 3, 10000, 10002, 30000]}]
+  - wss://relay.ditto.pub
+  - wss://wheat.oslim.dev
+
+filters:
+  - {} # every kind
+
+exclude_kinds: []
+respect_whitelist: false
+honor_deletions: true
+
+live:
+  enabled: true
+  overlap_seconds: 120
+
+backfill:
+  enabled: true
+  max_age_days: 30 # history depth is the main storage cost; 0 = everything
+  page_size: 500
+  page_interval_ms: 1000
+  page_timeout_seconds: 60
+
+workers: 4
+stats_interval_seconds: 300

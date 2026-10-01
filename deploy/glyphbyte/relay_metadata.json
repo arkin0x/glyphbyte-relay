@@ -1,0 +1,53 @@
+{
+  "_comment_pubkey": "Leave empty on a fresh deployment — first run will route operators to /setup to claim ownership via any Nostr signer. Or set GRAIN_OWNER_PUBKEY (hex or npub) in the environment to claim declaratively at startup without the UI step.",
+  "_comment_version": "version is overlaid at NIP-11 response time from the running build; the placeholder below is fine to leave as-is.",
+  "_comment_ui": "Most string fields default to empty: name / description / banner / icon / contact / policy URLs are best edited via the /admin dashboard once the relay is running. The dashboard's Ops section fires the corresponding NIP-86 changerelay* methods.",
+  "name": "glyphbyte",
+  "description": "Archive relay for glyphbyte lookups: harvests public relays so a handwritten partial event id (a prefix in ids or authors) resolves to its event.",
+  "banner": "",
+  "icon": "",
+  "pubkey": "",
+  "contact": "",
+  "supported_nips": [
+    1,
+    7,
+    9,
+    11,
+    19,
+    40,
+    42,
+    45,
+    50,
+    55,
+    65,
+    70,
+    86,
+    98
+  ],
+  "software": "https://github.com/arkin0x/grain",
+  "version": "0.0.0-dev",
+  "privacy_policy": "",
+  "terms_of_service": "",
+  "posting_policy": "",
+  "_comment_limitation": "The entire limitation block is computed from live config at NIP-11 serve time and editing it here has no effect — max_message_length from rate_limit.max_event_size, max_content_length from rate_limit.max_content_length, max_subscriptions from server.max_subscriptions_per_client, max_limit from server.implicit_req_limit, auth_required from auth.required, restricted_writes from whitelist, created_at_lower/upper_limit from event_time_constraints. Kept here only as documentation of the shape.",
+  "limitation": {
+    "max_message_length": 524288,
+    "max_content_length": 0,
+    "max_subscriptions": 10,
+    "max_limit": 500,
+    "auth_required": false,
+    "payment_required": false,
+    "restricted_writes": false,
+    "created_at_lower_limit": null,
+    "created_at_upper_limit": null
+  },
+  "language_tags": [
+    "en",
+    "en-US"
+  ],
+  "tags": [
+    "archive",
+    "search",
+    "prefix-lookup"
+  ]
+}

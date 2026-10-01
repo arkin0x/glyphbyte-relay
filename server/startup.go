@@ -155,6 +155,12 @@ func startConfigWatchers(restartChan chan<- struct{}) {
 		"relay_metadata.json",
 	}
 
+	// harvest.yml is optional; the watcher exits on a missing file, so it
+	// is only watched when present at startup.
+	if _, err := os.Stat(config.ConfigPath(harvestConfigFile)); err == nil {
+		watchFiles = append(watchFiles, harvestConfigFile)
+	}
+
 	for _, file := range watchFiles {
 		go config.WatchConfigFile(config.ConfigPath(file), restartChan)
 	}
@@ -425,6 +431,8 @@ func startBackgroundServices(ctx context.Context, cfg *cfgType.ServerConfig, dbA
 			// Surface LMDB map usage (WARN 80% / ERROR 95%) so a filling
 			// database is visible before writes start getting rejected.
 			db.StartMapUsageMonitor(ctx, 10*time.Minute)
+
+			startHarvester(ctx, db)
 		}
 
 		log.Startup().Info("All background services started")

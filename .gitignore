@@ -49,3 +49,10 @@ www/static/mill/*
 # release workflow. Committing it risks embedding a stale build; the
 # build always regenerates it from the current templates.
 www/style/tailwind.min.css
+
+# Build outputs of server/db/nostrdb/build.sh
+server/db/nostrdb/lib/
+server/db/nostrdb/include/
+# Deploy profiles ship their configs
+!deploy/*/config.yml
+!deploy/*/relay_metadata.json

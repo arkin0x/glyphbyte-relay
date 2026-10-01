@@ -1,0 +1,199 @@
+# glyphbyte relay: grain config for an archive/lookup relay that harvests
+# other relays (see harvest.yml). Derived from docs/examples/config.example.yml;
+# changes from it are marked GLYPHBYTE.
+# See docs/configuration.md for detailed explanations
+
+logging:
+  level: "info" # Log levels: "debug", "info", "warn", "error"
+  file: "debug" # Log file name
+  max_log_size_mb: 10 # Maximum log file size in MB before trimming
+  structure: false # true = structured JSON logs, false = pretty logs
+  stdout: true # Mirror log records to stdout (pretty single-line). Useful for Docker so `docker logs` works.
+  check_interval_min: 10 # Check every 10 minutes
+  backup_count: 2 # Keep 2 backup files (.bak1, .bak2)
+
+  # Components listed here have their INFO/DEBUG records dropped; WARN/ERROR
+  # always pass through. The default list silences high-volume utility and
+  # storage-layer chatter. Connection-layer components (relay-client,
+  # relay-connection, client-connection) are intentionally NOT suppressed —
+  # those are where lockup symptoms surface and you want them visible by
+  # default. Add components here only if you confirm they're spamming.
+  suppress_components:
+    - "util" # generic helper logs
+    - "log" # the logger reporting on itself (rotation, write errors)
+    - "db-query" # one INFO per query/search/count — extremely noisy under load
+    - "db-store" # one INFO per ingested/deleted event
+    - "close-handler" # subscription teardown noise
+    - "client-main"
+    - "client-api"
+    - "client-core"
+    - "client-tools"
+    - "client-data"
+    - "client-session"
+    - "client-cache"
+
+# See docs/configuration.md for the full component list and what each emits.
+
+database:
+  path: "data" # Directory for nostrdb data files (relative to data dir)
+  # Ceiling for the LMDB map, NOT a preallocation: on Linux this is a sparse
+  # virtual reservation and the file only grows with real data. Set it well
+  # above expected size so writes never hit the wall — a full map silently
+  # drops events. 65536 = 64 GB.
+  map_size_mb: 262144 # GLYPHBYTE: 256 GB ceiling (sparse; grows with data)
+  # Kinds whose content is tokenized for NIP-50 search. Omit for the
+  # default (0 profiles, 1 text notes, 30023 long-form); list the kinds
+  # your apps search on. Only events stored after the change are indexed,
+  # and a restart is needed to apply it. An empty list disables search.
+  # fulltext_kinds: [0, 1, 30023]
+
+# Client configuration for the built-in Nostr client
+client:
+  # Index relays — seed/discovery set the client library connects to first.
+  # Queried to resolve a user's NIP-65 mailbox list and profile metadata
+  # when no per-user relay set is known.
+  index_relays:
+    - "wss://profiles.nostr1.com"
+    - "wss://directory.yabu.me"
+    - "wss://user.kindpag.es"
+    - "wss://indexer.coracle.social"
+    - "wss://purplepag.es"
+
+  # Connection settings (in seconds)
+  connection_timeout: 10 # Time to wait for relay connection
+  read_timeout: 30 # Time to wait for relay responses
+  write_timeout: 10 # Time to wait when sending to relays
+
+  # Connection management
+  max_connections: 10 # Maximum simultaneous relay connections
+  retry_attempts: 3 # Number of retry attempts for failed connections
+  retry_delay: 2 # Delay between retry attempts (seconds)
+
+  # Client behavior
+  keep_alive: true # Maintain persistent connections
+  user_agent: "grain-client/1.0" # User agent string for relay connections
+
+server:
+  port: :8181
+  read_timeout: 60 # Timeout for reading a single WebSocket message from client
+  write_timeout: 20 # Timeout for writing a single WebSocket message to client
+  idle_timeout: 1200 # Connection-level timeout for inactive clients (in seconds); 0 disables.
+  max_connections: 100 # Hard cap on concurrent WebSocket clients. 0 disables the gate. Without this set, the relay accepts unlimited connections — set it on every production deployment.
+  max_subscriptions_per_client: 10
+  implicit_req_limit: 500 # Default limit applied to REQ when no limit is specified
+  connection_rate_limit_per_ip: 30 # Per-IP connection attempts per minute. Rejected before WS upgrade with HTTP 429. 0 disables.
+
+resource_limits:
+  cpu_cores: 2 # Limit the number of CPU cores the application can use
+  memory_mb: 2048 # Hard RSS cap in MB. Production grain at moderate load runs ~1GB; this leaves headroom. Raise for hosts with more RAM.
+  heap_size_mb: 1024 # Go GC heap soft target in MB. Should be roughly half of memory_mb so the runtime has room for stacks, mmap'd LMDB, etc.
+
+auth:
+  required: false # If true, clients MUST authenticate (NIP-42) before they can read or write.
+  # When required: true, this MUST be set to the externally-reachable URL clients
+  # use to connect (e.g. wss://relay.yourdomain.com/). The string is signed into
+  # the AUTH challenge and must match what the client sees, or the AUTH fails.
+  # Leave empty if required: false.
+  relay_url: ""
+  # How strictly the AUTH `relay` tag is compared against relay_url.
+  # Both modes canonicalize scheme + host (lowercase, strip default ports) and
+  # ignore trailing slashes. They differ in path handling:
+  #   strict (default) - path is significant. Safe for shared-host/multi-tenant
+  #                      deployments (a relay at /v1 won't accept AUTH for /v2).
+  #   host             - path is ignored entirely. Use this if clients in the
+  #                      wild append fingerprint suffixes to your URL and you
+  #                      don't share the host with another relay.
+  # Unknown values fall back to strict.
+  relay_url_match: "strict"
+
+backup_relay:
+  enabled: false # Set to true to enable sending events to the backup relays
+  urls: [] # Each accepted event is fanned out (in parallel) to every URL.
+          # Common patterns:
+          #   - a public blaster / broadcaster that re-publishes to many relays
+          #   - a private archival relay you control
+          #   - a peer relay you've paired with for federation
+          # Each entry must start with ws:// or wss://.
+
+event_purge:
+  enabled: false # Toggle to enable/disable event purging
+  disable_at_startup: true # Disable purging at startup
+  keep_interval_hours: 24 # Number of hours to keep events before purging
+  purge_interval_minutes: 240 # Interval in minutes for running the purge
+  purge_by_category: # Configure purging based on categories
+    regular: true
+    replaceable: false
+    addressable: false
+    deprecated: true
+  purge_by_kind_enabled: false # Enable purging by specific kinds, if false, all collections will be purged
+  kinds_to_purge: # List of event kinds to explicitly purge (kind 2 is deprecated and never stored, so don't list it)
+    - 1
+    - 1000
+  keep_kinds: [] # Kinds that are NEVER purged, overriding the category filter and kinds_to_purge (e.g. [0, 3, 10002] to always retain profiles + relay lists)
+  exclude_whitelisted: true # Exclude events from whitelisted pubkeys during purging
+
+event_time_constraints:
+  min_created_at: 1577836800 # January 1, 2020, as Unix timestamp
+  # min_created_at_string: now-5m  # Custom value to indicate 5 minutes in the past
+  # max_created_at: 0 # Set to 0 to use the default behavior of 'now'
+  max_created_at_string: now+5m # Use a string to set a date for max created at in the future or past from current time
+
+rate_limit:
+  ws_limit: 50 # WebSocket messages per second per client (any frame: EVENT, REQ, CLOSE, etc.)
+  ws_burst: 100 # Allowed burst of WebSocket messages
+  event_limit: 10 # EVENT messages per second per client
+  event_burst: 20 # Allowed burst of EVENTs
+  req_limit: 10 # REQ subscription messages per second per client. Clients commonly fire several REQs at startup (one per filter shape), so don't set this too tight.
+  req_burst: 30 # Allowed burst of REQs
+  max_event_size: 524288 # 512KB — reasonable for most Nostr events; applies to both event validation AND the WebSocket message buffer
+  max_content_length: 0 # Max characters in an event's `content` field. 0 = no limit (max_event_size still applies). When >0 it's enforced at ingest and advertised as NIP-11 limitation.max_content_length.
+
+  # Size limits for specific event kinds. Aligned with the
+  # "suggested" chips in the admin dashboard's Rate Limit section
+  # — same numbers, so a fresh deploy gets sensible defaults
+  # before the operator ever opens /admin.
+  # GLYPHBYTE: no per-kind size limits. The defaults (kind 1 at 4 KB, kind 0 at
+  # 8 KB, kind 7 at 512 B) refused ~17% of harvested events in testing; an
+  # archive keeps them and relies on max_event_size alone.
+  kind_size_limits: []
+
+  # Rate limits for different event categories
+  category_limits:
+    regular: # Kind 1, 4-44, 1000-9999 (most social media content)
+      limit: 8 # 8 events per second - most common events
+      burst: 16 # Allow posting several messages quickly
+    replaceable: # Kind 0, 3, 10000-19999 (profiles, contact lists, relay lists, mute lists)
+      limit: 5 # New users editing profile + contact list + relay list back-to-back can hit this; 5/sec leaves room.
+      burst: 10 # Allow a quick wave of replaceable updates at account-setup time
+    ephemeral: # Kind 20000-29999 (temporary events, not stored)
+      limit: 50 # 50 events per second - higher since not stored permanently
+      burst: 100 # Allow high bursts for real-time features
+    addressable: # Kind 30000-39999 (replaceable by d-tag)
+      limit: 3 # 3 events per second - often larger content
+      burst: 8 # Moderate burst for content creation sessions
+
+  # Rate limits for specific event kinds. Overrides category_limits
+  # for the listed kinds. Default is empty so operators opt in to
+  # per-kind tightening; the admin dashboard's "suggested" chips
+  # pre-fill these exact values for one-click adds.
+  #
+  # kind_limits:
+  #   - kind: 0       # Profile metadata — tight; identity updates should be rare
+  #     limit: 1
+  #     burst: 2
+  #   - kind: 1       # Text notes — tighter than regular category for spam control
+  #     limit: 5
+  #     burst: 12
+  #   - kind: 6       # Reposts — same tightness as notes
+  #     limit: 5
+  #     burst: 12
+  #   - kind: 7       # Reactions — loose; high volume but tiny
+  #     limit: 20
+  #     burst: 40
+  #   - kind: 9735    # Zap receipts — moderate; payment flows can spike
+  #     limit: 10
+  #     burst: 20
+  #   - kind: 30023   # Long-form articles — usually authored slowly
+  #     limit: 1
+  #     burst: 3
+  kind_limits: []

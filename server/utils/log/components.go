@@ -35,6 +35,7 @@ func ClientData() *slog.Logger       { return GetLogger("client-data") }
 func ClientConnection() *slog.Logger { return GetLogger("client-connection") }
 func ClientSession() *slog.Logger    { return GetLogger("client-session") }
 func ClientCache() *slog.Logger      { return GetLogger("client-cache") }
+func Harvest() *slog.Logger          { return GetLogger("harvest") }
 
 // GetAllComponents returns every component name emitted by the functions
 // above. Keep this in sync with them — it's the source the dashboard and
@@ -65,5 +66,6 @@ func GetAllComponents() []string {
 		"client-connection", // ClientConnection()
 		"client-session",    // ClientSession()
 		"client-cache",      // ClientCache()
+		"harvest",           // Harvest()
 	}
 }

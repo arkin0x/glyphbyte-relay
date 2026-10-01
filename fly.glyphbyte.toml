@@ -1,0 +1,43 @@
+# Fly.io app for the glyphbyte relay. Deploy from the repo root:
+#   fly launch --no-deploy --copy-config --config fly.glyphbyte.toml   (first time)
+#   fly deploy --config fly.glyphbyte.toml
+# Owner: fly secrets set GRAIN_OWNER_PUBKEY=<npub or hex> --config fly.glyphbyte.toml
+app = "glyphbyte-relay"
+primary_region = "ord"
+
+[build]
+  dockerfile = "deploy/Dockerfile"
+  [build.args]
+    PROFILE = "glyphbyte"
+
+[env]
+  GRAIN_DATA_DIR = "/data"
+
+[[mounts]]
+  source = "glyphbyte_data"
+  destination = "/data"
+  initial_size = "50gb"
+  snapshot_retention = 5
+
+[http_service]
+  internal_port = 8181
+  force_https = true
+  # A relay must stay up: harvesting runs with no client connected.
+  auto_stop_machines = "off"
+  auto_start_machines = false
+  min_machines_running = 1
+  [http_service.concurrency]
+    type = "connections"
+    soft_limit = 1000
+    hard_limit = 2000
+
+[[http_service.checks]]
+  grace_period = "30s"
+  interval = "30s"
+  method = "GET"
+  path = "/"
+  timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-2x"
+  memory = "2gb"

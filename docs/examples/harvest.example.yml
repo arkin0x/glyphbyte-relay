@@ -1,0 +1,60 @@
+# GRAIN harvest configuration (optional)
+#
+# Copy this file to harvest.yml in the data directory to make the relay pull
+# events from other relays. Without harvest.yml (or with enabled: false) the
+# relay never harvests. Editing harvest.yml restarts the server instance like
+# the other config files do; cursors are kept in harvest_state.json, so a
+# restart resumes where it stopped.
+#
+# Every harvested event goes through the same checks a client-published one
+# does: id and signature, created_at bounds, NIP-40 expiration, size limits and
+# the blacklist. On top of that the harvester never stores ephemeral kinds
+# (20000-29999), never copies NIP-70 protected events (["-"] tag), and never
+# stores an event its author already deleted (NIP-09) on this relay.
+# See docs/harvest.md.
+
+enabled: true
+
+# Upstream relays to harvest from: a URL, or {url, filters} to give one
+# relay its own filters (some relays refuse filters without kinds).
+relays:
+  - wss://relay.damus.io
+  - wss://nos.lol
+  - wss://relay.primal.net
+  - url: wss://purplepag.es
+    filters: [{kinds: [0, 3, 10002]}]
+
+# NIP-01 filters sent upstream. since, until and limit are managed by the
+# harvester. Leave the list empty (or remove it) to harvest every kind.
+filters:
+  - {} # everything
+  # - kinds: [0, 1, 3, 10002]
+  # - kinds: [30023]
+  #   authors: ["<hex pubkey>"]
+
+# Never store these kinds (ephemeral 20000-29999 are always skipped).
+exclude_kinds: []
+
+# Apply the relay's whitelist to harvested events. Usually off: the whitelist
+# governs who may publish here directly. The blacklist always applies.
+respect_whitelist: false
+
+# Refuse an event when this relay already holds its author's NIP-09 deletion.
+honor_deletions: true
+
+live:
+  enabled: true # keep a live subscription on every relay
+  overlap_seconds: 120 # history re-requested on every (re)connect
+
+backfill:
+  enabled: true # page backwards through each relay's history once
+  max_age_days: 30 # stop at events older than this; 0 = all history
+  page_size: 500 # limit per page (relays cap it; strfry at 500)
+  page_interval_ms: 1000 # pause between pages on one relay
+  page_timeout_seconds: 60 # retry a page that has not finished by then
+
+workers: 4 # goroutines verifying and storing, shared by all relays
+reconnect_min_seconds: 5
+reconnect_max_seconds: 300
+idle_timeout_seconds: 600 # reconnect a relay that sent nothing for this long
+stats_interval_seconds: 300 # per-relay summary in the log; negative = off
