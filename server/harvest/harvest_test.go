@@ -281,15 +281,18 @@ backfill: {page_interval_ms: 1}
 stats_interval_seconds: -1
 `)
 	store := newFakeStore()
-	fresh := s.event(t, 1, now, "live!")
+	// Created at publish time, after the backfill span's until (the
+	// connect time), as a real live event is.
+	var fresh nostr.Event
 	published := false
 	runHarvester(t, cfg, store, filepath.Join(t.TempDir(), "s.json"), func(*Harvester) bool {
 		// Once history is in, publish a live event.
 		if !published && store.has(other.ID) && store.has(del.ID) {
+			fresh = s.event(t, 1, time.Now().Unix()+1, "live!")
 			relay.publish(fresh)
 			published = true
 		}
-		return store.has(fresh.ID)
+		return published && store.has(fresh.ID)
 	})
 	if store.has(old.ID) {
 		t.Fatal("an event deleted by its author must not be resurrected by backfill")
