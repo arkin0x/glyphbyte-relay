@@ -17,6 +17,7 @@ type job struct {
 	size  int
 	stats *relayStats
 	wg    *sync.WaitGroup // backfill page waiting on this event, or nil
+	live  bool            // arrived on the live tail
 }
 
 // Harvester runs one worker per upstream relay and a shared pool that
@@ -26,6 +27,11 @@ type Harvester struct {
 	state    *State
 	ingester *Ingester
 	queue    chan job
+
+	// OnStored pushes a newly stored live-tail event to this relay's
+	// subscribers. Backfilled history is not pushed: subscribers expect
+	// live events to be new, and a backfill would flood them.
+	OnStored func(evt nostr.Event)
 
 	mu    sync.Mutex
 	stats map[string]*relayStats
@@ -41,7 +47,7 @@ func New(cfg *Config, ingester *Ingester, statePath string) (*Harvester, error) 
 		cfg:      cfg,
 		state:    st,
 		ingester: ingester,
-		queue:    make(chan job, 1024),
+		queue:    make(chan job, 256),
 		stats:    map[string]*relayStats{},
 	}, nil
 }
@@ -117,7 +123,7 @@ func (h *Harvester) relayStats(url string) *relayStats {
 // fast relay slows down instead of growing memory.
 func (h *Harvester) enqueue(ctx context.Context, evt nostr.Event, size int, stats *relayStats, wg *sync.WaitGroup) {
 	select {
-	case h.queue <- job{evt: evt, size: size, stats: stats, wg: wg}:
+	case h.queue <- job{evt: evt, size: size, stats: stats, wg: wg, live: wg == nil}:
 	case <-ctx.Done():
 		if wg != nil {
 			wg.Done()
@@ -143,6 +149,9 @@ func (h *Harvester) process(ctx context.Context) {
 		case j := <-h.queue:
 			outcome, err := h.ingester.Ingest(ctx, j.evt, j.size)
 			j.stats.count(outcome)
+			if outcome == Stored && j.live && h.OnStored != nil {
+				h.OnStored(j.evt)
+			}
 			if err != nil {
 				log.Harvest().Error("Failed to store harvested event", "event_id", j.evt.ID, "error", err)
 			}

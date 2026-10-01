@@ -108,9 +108,6 @@ type Ingester struct {
 	cfg    *Config
 	store  Store
 	checks Checks
-	// OnStored is called after an event is stored, to push it to live
-	// subscribers of this relay.
-	OnStored func(evt nostr.Event)
 
 	inflightMu sync.Mutex
 	inflight   map[string]struct{}
@@ -190,9 +187,6 @@ func (in *Ingester) Ingest(ctx context.Context, evt nostr.Event, size int) (Outc
 			return SkipStoreReject, nil
 		}
 		return Failed, err
-	}
-	if in.OnStored != nil {
-		in.OnStored(evt)
 	}
 	return Stored, nil
 }

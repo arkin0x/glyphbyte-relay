@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -124,8 +125,6 @@ func TestIngestOutcomes(t *testing.T) {
 	cfg := mustConfig(t, "enabled: true\nrelays: [wss://a.example]\nexclude_kinds: [7]\n")
 	store.rejects[noD.ID] = "no d tag present in addressable event"
 	in := NewIngester(cfg, store, testChecks())
-	var broadcast []string
-	in.OnStored = func(e nostr.Event) { broadcast = append(broadcast, e.ID) }
 
 	for _, d := range []nostr.Event{delGone, bobDel, delArticle} {
 		if o, err := in.Ingest(ctx, d, 100); o != Stored || err != nil {
@@ -161,10 +160,6 @@ func TestIngestOutcomes(t *testing.T) {
 			t.Errorf("%s: got outcome %s, want %s", c.name, got, c.want)
 		}
 	}
-	// 3 deletions + note + kept + newArticle
-	if len(broadcast) != 6 {
-		t.Errorf("broadcast %d events, want 6", len(broadcast))
-	}
 }
 
 func TestIngestPolicyHooks(t *testing.T) {
@@ -195,6 +190,11 @@ func TestIngestPolicyHooks(t *testing.T) {
 	}
 }
 
+var (
+	pushedMu sync.Mutex
+	pushed   []nostr.Event
+)
+
 // runHarvester runs a harvester against relays until cond holds or the
 // deadline passes, then stops it.
 func runHarvester(t *testing.T, cfg *Config, store *fakeStore, statePath string, cond func(h *Harvester) bool) *Harvester {
@@ -202,6 +202,11 @@ func runHarvester(t *testing.T, cfg *Config, store *fakeStore, statePath string,
 	h, err := New(cfg, NewIngester(cfg, store, testChecks()), statePath)
 	if err != nil {
 		t.Fatal(err)
+	}
+	h.OnStored = func(e nostr.Event) {
+		pushedMu.Lock()
+		pushed = append(pushed, e)
+		pushedMu.Unlock()
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
@@ -288,5 +293,20 @@ stats_interval_seconds: -1
 	})
 	if store.has(old.ID) {
 		t.Fatal("an event deleted by its author must not be resurrected by backfill")
+	}
+	// Only live-tail events reach subscribers; backfilled history does not.
+	pushedMu.Lock()
+	defer pushedMu.Unlock()
+	for _, e := range pushed {
+		if e.ID == other.ID {
+			t.Fatal("a backfilled event was pushed to live subscribers")
+		}
+	}
+	found := false
+	for _, e := range pushed {
+		found = found || e.ID == fresh.ID
+	}
+	if !found {
+		t.Fatal("the live event was not pushed to subscribers")
 	}
 }

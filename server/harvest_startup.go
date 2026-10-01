@@ -27,11 +27,11 @@ func startHarvester(ctx context.Context, db *nostrdb.NDB) {
 		return
 	}
 	ingester := harvest.NewIngester(cfg, db, harvest.RelayChecks(nostrdb.MapUsageRejectFraction))
-	ingester.OnStored = BroadcastEvent
 	h, err := harvest.New(cfg, ingester, config.ConfigPath(harvestStateFile))
 	if err != nil {
 		log.Harvest().Error("Harvest state unreadable; harvesting disabled", "error", err)
 		return
 	}
+	h.OnStored = BroadcastEvent
 	go h.Run(ctx)
 }
