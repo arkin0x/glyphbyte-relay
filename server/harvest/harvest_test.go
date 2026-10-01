@@ -197,7 +197,7 @@ func TestIngestPolicyHooks(t *testing.T) {
 
 // runHarvester runs a harvester against relays until cond holds or the
 // deadline passes, then stops it.
-func runHarvester(t *testing.T, cfg *Config, store *fakeStore, statePath string, cond func() bool) *Harvester {
+func runHarvester(t *testing.T, cfg *Config, store *fakeStore, statePath string, cond func(h *Harvester) bool) *Harvester {
 	t.Helper()
 	h, err := New(cfg, NewIngester(cfg, store, testChecks()), statePath)
 	if err != nil {
@@ -207,12 +207,12 @@ func runHarvester(t *testing.T, cfg *Config, store *fakeStore, statePath string,
 	done := make(chan struct{})
 	go func() { h.Run(ctx); close(done) }()
 	deadline := time.Now().Add(20 * time.Second)
-	for !cond() && time.Now().Before(deadline) {
+	for !cond(h) && time.Now().Before(deadline) {
 		time.Sleep(20 * time.Millisecond)
 	}
 	cancel()
 	<-done
-	if !cond() {
+	if !cond(h) {
 		t.Fatalf("condition not met before deadline; store has %d events", store.count())
 	}
 	return h
@@ -237,7 +237,11 @@ stats_interval_seconds: -1
 `)
 	store := newFakeStore()
 	statePath := filepath.Join(t.TempDir(), "harvest_state.json")
-	h := runHarvester(t, cfg, store, statePath, func() bool { return store.count() == len(history) })
+	// Done means every event stored AND the span closed by its final,
+	// empty page; stopping earlier legitimately leaves a page to fetch.
+	h := runHarvester(t, cfg, store, statePath, func(h *Harvester) bool {
+		return store.count() == len(history) && h.Statuses()[0].Spans == 0
+	})
 
 	st := h.Statuses()[0]
 	if st.Stored != int64(len(history)) || st.Invalid != 0 {
@@ -250,7 +254,7 @@ stats_interval_seconds: -1
 	before := relay.reqs
 	store2 := newFakeStore()
 	until := time.Now().Add(500 * time.Millisecond)
-	runHarvester(t, cfg, store2, statePath, func() bool { return time.Now().After(until) })
+	runHarvester(t, cfg, store2, statePath, func(*Harvester) bool { return time.Now().After(until) })
 	if relay.reqs != before || store2.count() != 0 {
 		t.Fatalf("finished backfill was re-run after restart: %d new REQs, %d events",
 			relay.reqs-before, store2.count())
@@ -274,7 +278,7 @@ stats_interval_seconds: -1
 	store := newFakeStore()
 	fresh := s.event(t, 1, now, "live!")
 	published := false
-	runHarvester(t, cfg, store, filepath.Join(t.TempDir(), "s.json"), func() bool {
+	runHarvester(t, cfg, store, filepath.Join(t.TempDir(), "s.json"), func(*Harvester) bool {
 		// Once history is in, publish a live event.
 		if !published && store.has(other.ID) && store.has(del.ID) {
 			relay.publish(fresh)
