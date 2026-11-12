@@ -25,6 +25,7 @@ Conflicts can only happen in the few grain files this repo changes:
 | `server/startup.go` | starts the harvester; watches `harvest.yml` |
 | `server/utils/log/components.go` | `harvest` log component |
 | `.gitignore` | nostrdb build outputs; deploy profile configs |
+| `server/utils/loadRelayMetadata.go`, `server/utils/ownerOverride_test.go` | `GRAIN_OWNER_PUBKEY` kept across metadata writes ([0ceanSlim/grain#112](https://github.com/0ceanSlim/grain/pull/112); take upstream's version of both once that merges) |
 
 Everything else this repo adds lives in new files. After merging, build and test:
 
